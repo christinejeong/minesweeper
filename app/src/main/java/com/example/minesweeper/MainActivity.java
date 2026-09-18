@@ -14,6 +14,11 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+
 import java.util.Random;
 import java.util.ArrayDeque;
 import java.util.Random;
@@ -35,6 +40,21 @@ public class MainActivity extends AppCompatActivity {
     private Button modeButton;
     private TextView remainingText;
     private TextView messageText;
+    private TextView timerText;
+    private long startMillis;
+    private int finalSeconds;
+
+    private final Handler timerHandler = new Handler(Looper.getMainLooper());
+
+    private final Runnable timerTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!gameOver) {
+                timerText.setText("◷ Time: " + elapsedSeconds() + " s");
+                timerHandler.postDelayed(this, 250);
+            }
+        }
+    };
 
     private int flagsPlaced = 0;
     private int safeCellsRevealed = 0;
@@ -69,6 +89,9 @@ public class MainActivity extends AppCompatActivity {
         modeButton = findViewById(R.id.modeButton);
         remainingText = findViewById(R.id.remainingText);
         messageText = findViewById(R.id.messageText);
+        timerText = findViewById(R.id.timerText);
+        startMillis = SystemClock.elapsedRealtime();
+        timerHandler.post(timerTick);
 
         placeMines();
         calculateAdjacentCounts();
@@ -190,6 +213,7 @@ public class MainActivity extends AppCompatActivity {
     private void onCellTapped(int row, int column) {
         // Step 8 will make this tap open the result page.
         if (gameOver) {
+            openResultPage();
             return;
         }
 
@@ -282,11 +306,14 @@ public class MainActivity extends AppCompatActivity {
     private void endGame(boolean didWin) {
         gameOver = true;
         won = didWin;
+        finalSeconds = elapsedSeconds();
+        timerHandler.removeCallbacks(timerTick);
+        timerText.setText("◷ Time: " + finalSeconds + " s");
 
         messageText.setText(
                 won
-                        ? "You won! The board is revealed."
-                        : "Mine hit! The board is revealed."
+                        ? "You won! Tap any cell to see the result."
+                        : "Mine hit! Tap any cell to see the result."
         );
 
         // renderBoard shows every cell when gameOver is true.
@@ -337,6 +364,26 @@ public class MainActivity extends AppCompatActivity {
                 );
             }
         }
+    }
+
+    private int elapsedSeconds() {
+        return (int) (
+                (SystemClock.elapsedRealtime() - startMillis) / 1000
+        );
+    }
+
+    private void openResultPage() {
+        Intent intent = new Intent(this, ResultActivity.class);
+        intent.putExtra("won", won);
+        intent.putExtra("seconds", finalSeconds);
+        startActivity(intent);
+        finish();
+    }
+
+    @Override
+    protected void onDestroy() {
+        timerHandler.removeCallbacks(timerTick);
+        super.onDestroy();
     }
 
     private int dp(int value) {
